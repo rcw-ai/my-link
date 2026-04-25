@@ -1,8 +1,10 @@
 "use client"
 
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { links } from "@/data/links"
+import { links as initialLinks, type Link } from "@/data/links"
 import { userData } from "@/data/user"
+import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { 
   RiInstagramLine, 
   RiYoutubeLine, 
@@ -21,6 +23,12 @@ const iconMap: Record<string, any> = {
 }
 
 export default function Page() {
+  const [linkList, setLinkList] = useState<Link[]>(initialLinks)
+
+  const handleAddLink = (newLink: Link) => {
+    setLinkList((prev) => [...prev, newLink])
+  }
+
   return (
     <div className="flex min-h-svh flex-col items-center px-6 py-16 selection:bg-primary selection:text-primary-foreground">
       {/* 프로필 섹션 */}
@@ -50,7 +58,8 @@ export default function Page() {
 
       {/* 링크 목록 */}
       <div className="flex w-full max-w-md flex-col gap-6">
-        {links.map((link) => {
+        <AddLinkDialog onAdd={handleAddLink} />
+        {linkList.map((link) => {
           const Icon = iconMap[link.icon || ""] || RiExternalLinkLine
           
           return (
