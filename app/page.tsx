@@ -28,14 +28,14 @@ export default function Page() {
   const [linkList, setLinkList] = useState<Link[]>(initialLinks)
 
   useEffect(() => {
-    const q = query(collection(db, "users/anonymous/links"), orderBy("createdAt", "asc"))
+    const q = query(collection(db, "users/anonymous/links"), orderBy("createdAt", "desc"))
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const fetchedLinks = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       })) as Link[]
       
-      setLinkList([...initialLinks, ...fetchedLinks])
+      setLinkList([...fetchedLinks, ...initialLinks])
     })
 
     return () => unsubscribe()
