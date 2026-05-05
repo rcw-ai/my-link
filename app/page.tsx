@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { links as initialLinks, type Link } from "@/data/links"
 import { userData } from "@/data/user"
 import { AddLinkDialog } from "@/components/AddLinkDialog"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "firebase/firestore"
 import { 
   RiInstagramLine, 
   RiYoutubeLine, 
@@ -25,8 +27,31 @@ const iconMap: Record<string, any> = {
 export default function Page() {
   const [linkList, setLinkList] = useState<Link[]>(initialLinks)
 
-  const handleAddLink = (newLink: Link) => {
-    setLinkList((prev) => [...prev, newLink])
+  useEffect(() => {
+    const q = query(collection(db, "users/anonymous/links"), orderBy("createdAt", "asc"))
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedLinks = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Link[]
+      
+      setLinkList([...initialLinks, ...fetchedLinks])
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  const handleAddLink = async (newLink: Link) => {
+    try {
+      await addDoc(collection(db, "users/anonymous/links"), {
+        title: newLink.title,
+        url: newLink.url,
+        icon: newLink.icon || "external-link",
+        createdAt: serverTimestamp(),
+      })
+    } catch (error) {
+      console.error("Error adding link: ", error)
+    }
   }
 
   return (
