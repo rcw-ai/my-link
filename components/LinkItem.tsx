@@ -42,9 +42,10 @@ type FormValues = z.infer<typeof formSchema>
 
 interface LinkItemProps {
   link: Link
+  userId: string
 }
 
-export function LinkItem({ link }: LinkItemProps) {
+export function LinkItem({ link, userId }: LinkItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -61,7 +62,7 @@ export function LinkItem({ link }: LinkItemProps) {
 
   const handleUpdate = async (values: FormValues) => {
     try {
-      const docRef = doc(db, "users/anonymous/links", link.id)
+      const docRef = doc(db, `users/${userId}/links`, link.id)
       await updateDoc(docRef, {
         title: values.title,
         url: values.url,
@@ -75,7 +76,7 @@ export function LinkItem({ link }: LinkItemProps) {
   const handleDelete = async () => {
     setIsDeleting(true)
     try {
-      const docRef = doc(db, "users/anonymous/links", link.id)
+      const docRef = doc(db, `users/${userId}/links`, link.id)
       await deleteDoc(docRef)
       setDeleteDialogOpen(false)
     } catch (error) {
