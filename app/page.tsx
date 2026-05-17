@@ -30,7 +30,6 @@ export default function Page() {
 
   useEffect(() => {
     if (!user) {
-      setLinkList([])
       return
     }
 
@@ -86,6 +85,8 @@ export default function Page() {
   const handleLogout = async () => {
     try {
       await signOut(auth)
+      setLinkList([])
+      setBio("한줄 소개를 입력해주세요")
     } catch (error) {
       console.error("Logout failed:", error)
     }

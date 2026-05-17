@@ -8,7 +8,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Link } from "@/data/links"
 import { RiAddLine } from "@remixicon/react"
 
@@ -36,7 +35,7 @@ export function AddLinkDialog({ onAdd }: AddLinkDialogProps) {
 
   const onSubmit = (values: FormValues) => {
     const newLink: Link = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: values.title,
       url: values.url,
       icon: "external-link"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, ElementType } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { type Link } from "@/data/links"
 import { db } from "@/lib/firebase"
@@ -25,7 +25,7 @@ import {
   RiCloseLine
 } from "@remixicon/react"
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, ElementType> = {
   instagram: RiInstagramLine,
   youtube: RiYoutubeLine,
   rss: RiRssLine,
