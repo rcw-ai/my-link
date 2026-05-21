@@ -43,9 +43,10 @@ type FormValues = z.infer<typeof formSchema>
 interface LinkItemProps {
   link: Link
   userId: string
+  readOnly?: boolean
 }
 
-export function LinkItem({ link, userId }: LinkItemProps) {
+export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -155,7 +156,7 @@ export function LinkItem({ link, userId }: LinkItemProps) {
 
   return (
     <>
-      <div className="group relative flex w-full gap-2">
+      <div className={`group relative flex w-full ${readOnly ? "" : "gap-2"}`}>
         <a
           href={link.url}
           target="_blank"
@@ -178,24 +179,26 @@ export function LinkItem({ link, userId }: LinkItemProps) {
         </a>
 
         {/* 수정 및 삭제 버튼 컨테이너 */}
-        <div className="flex flex-col gap-2 shrink-0 w-12">
-          <Button
-            size="icon"
-            onClick={() => setIsEditing(true)}
-            className="flex-1 border-4 border-foreground bg-background hover:bg-accent text-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all rounded-none"
-            title="수정"
-          >
-            <RiPencilLine size={18} />
-          </Button>
-          <Button
-            size="icon"
-            onClick={() => setDeleteDialogOpen(true)}
-            className="flex-1 border-4 border-foreground bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all rounded-none"
-            title="삭제"
-          >
-            <RiDeleteBinLine size={18} />
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex flex-col gap-2 shrink-0 w-12">
+            <Button
+              size="icon"
+              onClick={() => setIsEditing(true)}
+              className="flex-1 border-4 border-foreground bg-background hover:bg-accent text-foreground shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all rounded-none"
+              title="수정"
+            >
+              <RiPencilLine size={18} />
+            </Button>
+            <Button
+              size="icon"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="flex-1 border-4 border-foreground bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all rounded-none"
+              title="삭제"
+            >
+              <RiDeleteBinLine size={18} />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* 삭제 확인 모달 */}

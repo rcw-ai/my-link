@@ -6,7 +6,7 @@ import { userData } from "@/data/user"
 import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { LinkItem } from "@/components/LinkItem"
 import { auth, db, googleProvider } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, setDoc } from "firebase/firestore"
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine } from "@remixicon/react"
@@ -16,9 +16,51 @@ export default function Page() {
   const [user, setUser] = useState<User | null>(null)
   const [authInitialized, setAuthInitialized] = useState(false)
   const [copied, setCopied] = useState(false)
+  
+  // 프로필 정보 상태
+  const [username, setUsername] = useState("User")
+  const [displayName, setDisplayName] = useState("user")
   const [bio, setBio] = useState("한줄 소개를 입력해주세요")
+
+  // 인라인 편집 상태
+  const [isEditingUsername, setIsEditingUsername] = useState(false)
+  const [tempUsername, setTempUsername] = useState("")
+
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false)
+  const [tempDisplayName, setTempDisplayName] = useState("")
+  const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false)
+  const [isDuplicate, setIsDuplicate] = useState(false)
+  const [displayNameError, setDisplayNameError] = useState("")
+
   const [isEditingBio, setIsEditingBio] = useState(false)
   const [tempBio, setTempBio] = useState("")
+
+  // 고유한 displayName 생성 함수
+  const generateUniqueDisplayName = async (baseName: string): Promise<string> => {
+    let cleanName = baseName.replace(/[^a-zA-Z0-9가-힣_]/g, "");
+    if (!cleanName) cleanName = "user";
+    
+    let isUnique = false;
+    let candidate = cleanName;
+    let attempt = 0;
+    
+    while (!isUnique) {
+      const q = query(collection(db, "users"), where("displayName", "==", candidate));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) {
+        isUnique = true;
+      } else {
+        attempt++;
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        candidate = `${cleanName}${randomNum}`;
+      }
+      if (attempt > 10) {
+        candidate = `${cleanName}${Date.now().toString().slice(-4)}`;
+        break;
+      }
+    }
+    return candidate;
+  }
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -35,14 +77,34 @@ export default function Page() {
 
     const fetchProfile = async () => {
       try {
-        const userDoc = await getDoc(doc(db, "users", user.uid))
-        if (userDoc.exists() && userDoc.data().bio) {
-          setBio(userDoc.data().bio)
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnapshot = await getDoc(userDocRef);
+        
+        if (userDocSnapshot.exists()) {
+          const data = userDocSnapshot.data();
+          setUsername(data.username || user.displayName || "User");
+          setDisplayName(data.displayName || user.email?.split('@')[0] || "user");
+          setBio(data.bio || "한줄 소개를 입력해주세요");
         } else {
-          setBio("한줄 소개를 입력해주세요")
+          // 최초 가입 시 중복 없는 고유 닉네임 지정
+          const baseName = user.email?.split('@')[0] || "user";
+          const uniqueName = await generateUniqueDisplayName(baseName);
+          const initialUsername = user.displayName || "User";
+          const initialBio = "한줄 소개를 입력해주세요";
+          
+          await setDoc(userDocRef, {
+            username: initialUsername,
+            displayName: uniqueName,
+            bio: initialBio,
+            createdAt: serverTimestamp()
+          });
+          
+          setUsername(initialUsername);
+          setDisplayName(uniqueName);
+          setBio(initialBio);
         }
       } catch (error) {
-        console.error("Error fetching profile:", error)
+        console.error("Error fetching profile:", error);
       }
     }
     fetchProfile()
@@ -59,6 +121,61 @@ export default function Page() {
 
     return () => unsubscribe()
   }, [user])
+
+  // 닉네임 실시간 중복 및 유효성 검사 (디바운스 300ms)
+  useEffect(() => {
+    if (!isEditingDisplayName || tempDisplayName === displayName) {
+      setIsDuplicate(false);
+      setDisplayNameError("");
+      return;
+    }
+
+    const regex = /^[a-zA-Z0-9가-힣_]+$/;
+    if (!tempDisplayName) {
+      setDisplayNameError("닉네임을 입력해주세요.");
+      setIsDuplicate(true);
+      return;
+    }
+    if (!regex.test(tempDisplayName)) {
+      setDisplayNameError("한글, 영문, 숫자, 언더스코어(_)만 사용할 수 있습니다.");
+      setIsDuplicate(true);
+      return;
+    }
+
+    setDisplayNameError("");
+    setIsCheckingDuplicate(true);
+
+    const checkDuplicate = async () => {
+      try {
+        const q = query(collection(db, "users"), where("displayName", "==", tempDisplayName));
+        const snapshot = await getDocs(q);
+        
+        let dup = false;
+        snapshot.forEach((doc) => {
+          if (doc.id !== user?.uid) {
+            dup = true;
+          }
+        });
+
+        setIsDuplicate(dup);
+        if (dup) {
+          setDisplayNameError("이미 사용 중인 닉네임입니다.");
+        } else {
+          setDisplayNameError("");
+        }
+      } catch (error) {
+        console.error("Error checking duplicate:", error);
+      } finally {
+        setIsCheckingDuplicate(false);
+      }
+    };
+
+    const delayDebounceFn = setTimeout(() => {
+      checkDuplicate();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [tempDisplayName, isEditingDisplayName, displayName, user]);
 
   const handleAddLink = async (newLink: Link) => {
     if (!user) return
@@ -86,6 +203,8 @@ export default function Page() {
     try {
       await signOut(auth)
       setLinkList([])
+      setUsername("User")
+      setDisplayName("user")
       setBio("한줄 소개를 입력해주세요")
     } catch (error) {
       console.error("Logout failed:", error)
@@ -94,9 +213,39 @@ export default function Page() {
 
   const handleCopyLink = () => {
     if (!user) return
-    navigator.clipboard.writeText(`${window.location.origin}/@${user.email?.split('@')[0] || "user"}`)
+    navigator.clipboard.writeText(`${window.location.origin}/${displayName}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleUsernameSave = async () => {
+    setIsEditingUsername(false)
+    const trimmed = tempUsername.trim()
+    if (trimmed && trimmed !== username && user) {
+      setUsername(trimmed)
+      try {
+        await setDoc(doc(db, "users", user.uid), { username: trimmed }, { merge: true })
+      } catch (error) {
+        console.error("Error saving username:", error)
+        setUsername(username)
+      }
+    }
+  }
+
+  const handleDisplayNameSave = async () => {
+    if (isDuplicate || displayNameError || isCheckingDuplicate) return;
+    
+    setIsEditingDisplayName(false)
+    const trimmed = tempDisplayName.trim()
+    if (trimmed && trimmed !== displayName && user) {
+      setDisplayName(trimmed)
+      try {
+        await setDoc(doc(db, "users", user.uid), { displayName: trimmed }, { merge: true })
+      } catch (error) {
+        console.error("Error saving displayName:", error)
+        setDisplayName(displayName)
+      }
+    }
   }
 
   const handleBioSave = async () => {
@@ -125,14 +274,10 @@ export default function Page() {
         </div>
         {user ? (
           <div className="relative group">
-            <div className="h-10 w-10 border-2 border-foreground bg-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <span className="flex items-center justify-center w-full h-full font-black text-sm text-foreground">
-                  {user.displayName?.substring(0, 2).toUpperCase() || "ML"}
-                </span>
-              )}
+            <div className="h-10 w-10 border-2 border-foreground bg-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all flex items-center justify-center">
+              <span className="font-black text-sm text-foreground">
+                {username.substring(0, 2).toUpperCase() || "ML"}
+              </span>
             </div>
             
             <div className="absolute right-0 mt-2 w-48 border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 origin-top-right">
@@ -163,27 +308,81 @@ export default function Page() {
       {user ? (
         <div className="flex w-full max-w-md flex-col items-center">
           {/* 프로필 섹션 */}
-          <div className="mb-12 flex flex-col items-center text-center">
+          <div className="mb-12 flex flex-col items-center text-center w-full">
             <div className="relative mb-6">
               <div className="absolute inset-0 translate-x-1.5 translate-y-1.5 bg-foreground" />
               <div className="relative border-4 border-foreground bg-primary p-1">
                 <div className="h-24 w-24 bg-background flex items-center justify-center border-2 border-foreground overflow-hidden">
-                  {user.photoURL ? (
-                    <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-4xl font-black text-foreground">{user.displayName?.substring(0, 2).toUpperCase() || "ML"}</span>
-                  )}
+                  <span className="text-4xl font-black text-foreground">{username.substring(0, 2).toUpperCase() || "ML"}</span>
                 </div>
               </div>
             </div>
 
-            <div className="relative">
-              <h1 className="text-3xl font-black uppercase tracking-tighter text-foreground bg-accent px-4 py-2 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]">
-                {user.displayName || "User"}
-              </h1>
-              <p className="mt-4 font-bold text-lg text-foreground px-2">
-                @{user.email?.split('@')[0] || "user"}
-              </p>
+            <div className="flex flex-col items-center gap-3 w-full">
+              {isEditingUsername ? (
+                <div className="flex flex-col items-center w-full max-w-xs">
+                  <input
+                    type="text"
+                    value={tempUsername}
+                    onChange={(e) => setTempUsername(e.target.value)}
+                    onBlur={handleUsernameSave}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleUsernameSave() }}
+                    className="text-2xl font-black text-center border-4 border-foreground bg-background px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none w-full"
+                    autoFocus
+                  />
+                  <span className="text-[10px] text-muted-foreground mt-1 font-bold">실명을 입력하고 Enter를 누르세요.</span>
+                </div>
+              ) : (
+                <h1 
+                  onClick={() => {
+                    setTempUsername(username)
+                    setIsEditingUsername(true)
+                  }}
+                  className="text-3xl font-black uppercase tracking-tighter text-foreground bg-accent px-4 py-2 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all"
+                  title="클릭하여 수정"
+                >
+                  {username}
+                </h1>
+              )}
+
+              {isEditingDisplayName ? (
+                <div className="flex flex-col items-center w-full max-w-xs">
+                  <div className="relative w-full flex items-center">
+                    <span className="absolute left-3 text-lg font-black text-foreground">@</span>
+                    <input
+                      type="text"
+                      value={tempDisplayName}
+                      onChange={(e) => setTempDisplayName(e.target.value)}
+                      onBlur={handleDisplayNameSave}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleDisplayNameSave() }}
+                      className="pl-8 pr-4 py-2 w-full font-bold text-lg text-center border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none"
+                      autoFocus
+                    />
+                  </div>
+                  
+                  {isCheckingDuplicate && (
+                    <span className="text-xs text-blue-500 font-bold mt-2">중복 확인 중...</span>
+                  )}
+                  {!isCheckingDuplicate && displayNameError && (
+                    <span className="text-xs text-destructive font-bold mt-2">{displayNameError}</span>
+                  )}
+                  {!isCheckingDuplicate && !displayNameError && tempDisplayName && tempDisplayName !== displayName && (
+                    <span className="text-xs text-emerald-500 font-bold mt-2">사용 가능한 닉네임입니다.</span>
+                  )}
+                  <span className="text-[10px] text-muted-foreground mt-1">닉네임은 고유한 공유 URL로 사용됩니다.</span>
+                </div>
+              ) : (
+                <p 
+                  onClick={() => {
+                    setTempDisplayName(displayName)
+                    setIsEditingDisplayName(true)
+                  }}
+                  className="font-bold text-lg text-foreground px-2 cursor-pointer hover:text-primary transition-colors"
+                  title="클릭하여 수정"
+                >
+                  @{displayName}
+                </p>
+              )}
             </div>
 
             {isEditingBio ? (
@@ -193,7 +392,7 @@ export default function Page() {
                 onChange={(e) => setTempBio(e.target.value)}
                 onBlur={handleBioSave}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleBioSave() }}
-                className="mt-4 max-w-xs w-full font-medium leading-relaxed text-center border-b-2 border-foreground bg-transparent focus:outline-none"
+                className="mt-6 max-w-xs w-full font-medium leading-relaxed text-center border-b-2 border-foreground bg-transparent focus:outline-none"
                 autoFocus
               />
             ) : (
@@ -202,7 +401,7 @@ export default function Page() {
                   setTempBio(bio)
                   setIsEditingBio(true)
                 }}
-                className="mt-4 max-w-xs font-medium leading-relaxed text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
+                className="mt-6 max-w-xs font-medium leading-relaxed text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
                 title="클릭하여 수정"
               >
                 &quot;{bio}&quot;
