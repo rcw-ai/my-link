@@ -8,7 +8,7 @@ import { LinkItem } from "@/components/LinkItem"
 import { LandingView } from "@/components/LandingView"
 import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
-import { signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User } from "firebase/auth"
+import { signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, signInWithPopup } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine, RiBarChartBoxLine } from "@remixicon/react"
 import Link from "next/link"
@@ -231,8 +231,13 @@ export default function Page() {
 
   const handleLogin = async () => {
     try {
-      // 모바일 인앱 브라우저나 팝업 차단 환경을 위해 팝업 대신 리다이렉트 방식 사용
-      await signInWithRedirect(auth, googleProvider)
+      // 모바일 기기(인앱 브라우저 등)에서는 팝업 차단을 피하기 위해 리다이렉트 사용, PC/개발환경에서는 팝업 사용
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      if (isMobile) {
+        await signInWithRedirect(auth, googleProvider)
+      } else {
+        await signInWithPopup(auth, googleProvider)
+      }
     } catch (error) {
       console.error("Login failed:", error)
     }
