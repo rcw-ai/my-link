@@ -230,8 +230,22 @@ export default function Page() {
 
   const handleLogin = async () => {
     try {
-      // 모바일 기기(인앱 브라우저 등)에서는 팝업 차단을 피하기 위해 리다이렉트 사용, PC/개발환경에서는 팝업 사용
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobile = /iphone|ipad|ipod|android/.test(userAgent)
+      const isInAppBrowser = /kakaotalk|instagram|naver|line|fbav|fban/.test(userAgent)
+
+      // 인앱 브라우저(특히 카카오톡 등)에서는 구글 보안정책(Webview 차단)에 의해 로그인이 막힙니다.
+      if (isInAppBrowser) {
+        alert("보안 정책상 카카오톡 등 내부 브라우저에서는 구글 로그인이 불가능합니다.\n\n화면 우측 하단(또는 상단)의 [⠇] 메뉴를 눌러 '다른 브라우저로 열기(Safari/Chrome)'를 선택해 주세요!")
+        
+        // 안드로이드 카카오톡인 경우 외부 브라우저로 자동 연결 시도
+        if (/android/.test(userAgent) && /kakaotalk/.test(userAgent)) {
+          window.location.href = `intent://${window.location.href.replace(/https?:\/\//i, '')}#Intent;scheme=https;package=com.android.chrome;end`
+        }
+        return
+      }
+
+      // 모바일 기기에서는 팝업 차단을 피하기 위해 리다이렉트 사용, PC/개발환경에서는 팝업 사용
       if (isMobile) {
         await signInWithRedirect(auth, googleProvider)
       } else {
