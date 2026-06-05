@@ -12,6 +12,7 @@ import { Form, FormField, FormItem, FormControl, FormMessage } from "@/component
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { 
   RiInstagramLine, 
   RiYoutubeLine, 
@@ -47,9 +48,9 @@ interface LinkItemProps {
 }
 
 export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
+  const queryClient = useQueryClient()
   const [isEditing, setIsEditing] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
 
   const Icon = iconMap[link.icon || ""] || RiExternalLinkLine
 
@@ -61,30 +62,43 @@ export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
     },
   })
 
-  const handleUpdate = async (values: FormValues) => {
-    try {
+  const updateLinkMutation = useMutation({
+    mutationFn: async (values: FormValues) => {
       const docRef = doc(db, `users/${userId}/links`, link.id)
       await updateDoc(docRef, {
         title: values.title,
         url: values.url,
       })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", userId] })
       setIsEditing(false)
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error("Error updating link: ", error)
     }
-  }
+  })
 
-  const handleDelete = async () => {
-    setIsDeleting(true)
-    try {
+  const deleteLinkMutation = useMutation({
+    mutationFn: async () => {
       const docRef = doc(db, `users/${userId}/links`, link.id)
       await deleteDoc(docRef)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", userId] })
       setDeleteDialogOpen(false)
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error("Error deleting link: ", error)
-    } finally {
-      setIsDeleting(false)
     }
+  })
+
+  const handleUpdate = (values: FormValues) => {
+    updateLinkMutation.mutate(values)
+  }
+
+  const handleDelete = () => {
+    deleteLinkMutation.mutate()
   }
 
   const handleCancelEdit = () => {
@@ -222,7 +236,7 @@ export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
             <Button 
               type="button" 
               variant="destructive"
-              disabled={isDeleting}
+              disabled={deleteLinkMutation.isPending}
               onClick={handleDelete}
               className="border-2 border-foreground rounded-none font-bold uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all flex-1"
             >

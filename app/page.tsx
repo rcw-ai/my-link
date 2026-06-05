@@ -1,27 +1,22 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { type Link } from "@/data/links"
-import { userData } from "@/data/user"
 import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { LinkItem } from "@/components/LinkItem"
 import { auth, db, googleProvider } from "@/lib/firebase"
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
+import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine } from "@remixicon/react"
 
 export default function Page() {
-  const [linkList, setLinkList] = useState<Link[]>([])
+  const queryClient = useQueryClient()
   const [user, setUser] = useState<User | null>(null)
   const [authInitialized, setAuthInitialized] = useState(false)
   const [copied, setCopied] = useState(false)
   
-  // 프로필 정보 상태
-  const [username, setUsername] = useState("User")
-  const [displayName, setDisplayName] = useState("user")
-  const [bio, setBio] = useState("한줄 소개를 입력해주세요")
-
   // 인라인 편집 상태
   const [isEditingUsername, setIsEditingUsername] = useState(false)
   const [tempUsername, setTempUsername] = useState("")
@@ -70,61 +65,111 @@ export default function Page() {
     return () => unsubscribeAuth()
   }, [])
 
-  useEffect(() => {
-    if (!user) {
-      return
-    }
-
-    const fetchProfile = async () => {
-      try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnapshot = await getDoc(userDocRef);
-        
-        if (userDocSnapshot.exists()) {
-          const data = userDocSnapshot.data();
-          setUsername(data.username || user.displayName || "User");
-          setDisplayName(data.displayName || user.email?.split('@')[0] || "user");
-          setBio(data.bio || "한줄 소개를 입력해주세요");
-        } else {
-          // 최초 가입 시 중복 없는 고유 닉네임 지정
-          const baseName = user.email?.split('@')[0] || "user";
-          const uniqueName = await generateUniqueDisplayName(baseName);
-          const initialUsername = user.displayName || "User";
-          const initialBio = "한줄 소개를 입력해주세요";
-          
-          await setDoc(userDocRef, {
-            username: initialUsername,
-            displayName: uniqueName,
-            bio: initialBio,
-            createdAt: serverTimestamp()
-          });
-          
-          setUsername(initialUsername);
-          setDisplayName(uniqueName);
-          setBio(initialBio);
+  // Profile Query
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["profile", user?.uid],
+    queryFn: async () => {
+      if (!user) return null
+      const userDocRef = doc(db, "users", user.uid)
+      const userDocSnapshot = await getDoc(userDocRef)
+      
+      if (userDocSnapshot.exists()) {
+        const data = userDocSnapshot.data()
+        return {
+          username: data.username || user.displayName || "User",
+          displayName: data.displayName || user.email?.split('@')[0] || "user",
+          bio: data.bio || "한줄 소개를 입력해주세요"
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
+      } else {
+        // 최초 가입 시
+        const baseName = user.email?.split('@')[0] || "user"
+        const uniqueName = await generateUniqueDisplayName(baseName)
+        const initialUsername = user.displayName || "User"
+        const initialBio = "한줄 소개를 입력해주세요"
+        
+        await setDoc(userDocRef, {
+          username: initialUsername,
+          displayName: uniqueName,
+          bio: initialBio,
+          createdAt: serverTimestamp()
+        })
+        
+        return {
+          username: initialUsername,
+          displayName: uniqueName,
+          bio: initialBio
+        }
       }
-    }
-    fetchProfile()
+    },
+    enabled: !!user,
+  })
 
-    const q = query(collection(db, `users/${user.uid}/links`), orderBy("createdAt", "desc"))
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedLinks = snapshot.docs.map((doc) => ({
+  // Links Query
+  const { data: linkList = [], isLoading: isLinksLoading } = useQuery({
+    queryKey: ["links", user?.uid],
+    queryFn: async () => {
+      if (!user) return []
+      const q = query(collection(db, `users/${user.uid}/links`), orderBy("createdAt", "desc"))
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       })) as Link[]
+    },
+    enabled: !!user,
+  })
 
-      setLinkList(fetchedLinks)
-    })
+  // Profile Update Mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: { username?: string; displayName?: string; bio?: string }) => {
+      if (!user) throw new Error("No user")
+      await setDoc(doc(db, "users", user.uid), data, { merge: true })
+    },
+    onMutate: async (newData) => {
+      // 진행 중인 리페치를 취소하여 낙관적 캐시가 덮어씌워지지 않게 방지
+      await queryClient.cancelQueries({ queryKey: ["profile", user?.uid] })
+      // 에러 시 롤백을 위해 이전 데이터 저장
+      const previousProfile = queryClient.getQueryData(["profile", user?.uid])
+      // 캐시를 새로운 값으로 즉시 업데이트
+      if (previousProfile) {
+        queryClient.setQueryData(["profile", user?.uid], {
+          ...(previousProfile as any),
+          ...newData
+        })
+      }
+      return { previousProfile }
+    },
+    onError: (err, newData, context) => {
+      // 에러 발생 시 이전 상태로 롤백
+      if (context?.previousProfile) {
+        queryClient.setQueryData(["profile", user?.uid], context.previousProfile)
+      }
+    },
+    onSettled: () => {
+      // 백그라운드 갱신을 통해 항상 서버와 동일한 최신 상태 유지
+      queryClient.invalidateQueries({ queryKey: ["profile", user?.uid] })
+    }
+  })
 
-    return () => unsubscribe()
-  }, [user])
+  // Add Link Mutation
+  const addLinkMutation = useMutation({
+    mutationFn: async (newLink: Link) => {
+      if (!user) throw new Error("No user")
+      await addDoc(collection(db, `users/${user.uid}/links`), {
+        title: newLink.title,
+        url: newLink.url,
+        icon: newLink.icon || "external-link",
+        createdAt: serverTimestamp(),
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["links", user?.uid] })
+    }
+  })
 
-  // 닉네임 실시간 중복 및 유효성 검사 (디바운스 300ms)
+  // 닉네임 실시간 중복 검사 (디바운스 300ms)
   useEffect(() => {
-    if (!isEditingDisplayName || tempDisplayName === displayName) {
+    if (!isEditingDisplayName || tempDisplayName === profile?.displayName) {
       setIsDuplicate(false);
       setDisplayNameError("");
       return;
@@ -175,21 +220,7 @@ export default function Page() {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [tempDisplayName, isEditingDisplayName, displayName, user]);
-
-  const handleAddLink = async (newLink: Link) => {
-    if (!user) return
-    try {
-      await addDoc(collection(db, `users/${user.uid}/links`), {
-        title: newLink.title,
-        url: newLink.url,
-        icon: newLink.icon || "external-link",
-        createdAt: serverTimestamp(),
-      })
-    } catch (error) {
-      console.error("Error adding link: ", error)
-    }
-  }
+  }, [tempDisplayName, isEditingDisplayName, profile?.displayName, user]);
 
   const handleLogin = async () => {
     try {
@@ -202,18 +233,15 @@ export default function Page() {
   const handleLogout = async () => {
     try {
       await signOut(auth)
-      setLinkList([])
-      setUsername("User")
-      setDisplayName("user")
-      setBio("한줄 소개를 입력해주세요")
+      queryClient.clear()
     } catch (error) {
       console.error("Logout failed:", error)
     }
   }
 
   const handleCopyLink = () => {
-    if (!user) return
-    navigator.clipboard.writeText(`${window.location.origin}/${displayName}`)
+    if (!profile) return
+    navigator.clipboard.writeText(`${window.location.origin}/${profile.displayName}`)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -221,14 +249,8 @@ export default function Page() {
   const handleUsernameSave = async () => {
     setIsEditingUsername(false)
     const trimmed = tempUsername.trim()
-    if (trimmed && trimmed !== username && user) {
-      setUsername(trimmed)
-      try {
-        await setDoc(doc(db, "users", user.uid), { username: trimmed }, { merge: true })
-      } catch (error) {
-        console.error("Error saving username:", error)
-        setUsername(username)
-      }
+    if (trimmed && trimmed !== profile?.username) {
+      updateProfileMutation.mutate({ username: trimmed })
     }
   }
 
@@ -237,33 +259,25 @@ export default function Page() {
     
     setIsEditingDisplayName(false)
     const trimmed = tempDisplayName.trim()
-    if (trimmed && trimmed !== displayName && user) {
-      setDisplayName(trimmed)
-      try {
-        await setDoc(doc(db, "users", user.uid), { displayName: trimmed }, { merge: true })
-      } catch (error) {
-        console.error("Error saving displayName:", error)
-        setDisplayName(displayName)
-      }
+    if (trimmed && trimmed !== profile?.displayName) {
+      updateProfileMutation.mutate({ displayName: trimmed })
     }
   }
 
   const handleBioSave = async () => {
     setIsEditingBio(false)
-    if (tempBio !== bio && user) {
-      setBio(tempBio)
-      try {
-        await setDoc(doc(db, "users", user.uid), { bio: tempBio }, { merge: true })
-      } catch (error) {
-        console.error("Error saving bio:", error)
-        setBio(bio) // revert on error
-      }
+    if (tempBio !== profile?.bio) {
+      updateProfileMutation.mutate({ bio: tempBio })
     }
   }
 
-  if (!authInitialized) {
+  if (!authInitialized || (user && isProfileLoading)) {
     return <div className="flex min-h-svh items-center justify-center font-bold text-xl uppercase">Loading...</div>
   }
+
+  const username = profile?.username || "User"
+  const displayName = profile?.displayName || "user"
+  const bio = profile?.bio || "한줄 소개를 입력해주세요"
 
   return (
     <div className="flex min-h-svh flex-col items-center px-6 py-16 selection:bg-primary selection:text-primary-foreground">
@@ -304,7 +318,7 @@ export default function Page() {
         )}
       </header>
 
-      {/* 메인 콘텐츠 (로그인 여부에 따라 분기) */}
+      {/* 메인 콘텐츠 */}
       {user ? (
         <div className="flex w-full max-w-md flex-col items-center">
           {/* 프로필 섹션 */}
@@ -411,8 +425,10 @@ export default function Page() {
 
           {/* 링크 목록 */}
           <div className="flex w-full flex-col gap-6">
-            <AddLinkDialog onAdd={handleAddLink} />
-            {linkList.map((link) => (
+            <AddLinkDialog onAdd={(link) => addLinkMutation.mutate(link)} />
+            {isLinksLoading ? (
+              <div className="text-center font-bold text-muted-foreground">링크 로딩 중...</div>
+            ) : linkList.map((link) => (
               <LinkItem key={link.id} link={link} userId={user.uid} />
             ))}
           </div>

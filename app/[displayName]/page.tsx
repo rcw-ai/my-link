@@ -1,11 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { useState, useEffect } from "react"
 import { db } from "@/lib/firebase"
-import { collection, query, where, getDocs, onSnapshot, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
 import { type Link } from "@/data/links"
 import { LinkItem } from "@/components/LinkItem"
+import { useQuery } from "@tanstack/react-query"
 
 interface PageProps {
   params: Promise<{
@@ -17,60 +17,43 @@ export default function VisitorPage({ params }: PageProps) {
   const resolvedParams = React.use(params)
   const displayName = decodeURIComponent(resolvedParams.displayName)
   
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<{ uid: string; username: string; displayName: string; bio: string } | null>(null)
-  const [links, setLinks] = useState<Link[]>([])
+  const { data: profile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["visitorProfile", displayName],
+    queryFn: async () => {
+      const q = query(collection(db, "users"), where("displayName", "==", displayName))
+      const querySnapshot = await getDocs(q)
+      
+      if (querySnapshot.empty) {
+        return null
+      }
 
-  useEffect(() => {
-    let unsubscribeLinks: (() => void) | undefined
-
-    const fetchUser = async () => {
-      try {
-        const q = query(collection(db, "users"), where("displayName", "==", displayName))
-        const querySnapshot = await getDocs(q)
-        if (querySnapshot.empty) {
-          setProfile(null)
-          setLoading(false)
-          return
-        }
-
-        const userDoc = querySnapshot.docs[0]
-        const data = userDoc.data()
-        const uid = userDoc.id
-
-        setProfile({
-          uid,
-          username: data.username || "User",
-          displayName: data.displayName || displayName,
-          bio: data.bio || "한줄 소개를 입력해주세요"
-        })
-
-        // 해당 유저의 링크 목록 구독
-        const linksQ = query(collection(db, `users/${uid}/links`), orderBy("createdAt", "desc"))
-        unsubscribeLinks = onSnapshot(linksQ, (snapshot) => {
-          const fetchedLinks = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Link[]
-          setLinks(fetchedLinks)
-          setLoading(false)
-        })
-      } catch (error) {
-        console.error("Error fetching visitor page data:", error)
-        setLoading(false)
+      const userDoc = querySnapshot.docs[0]
+      const data = userDoc.data()
+      
+      return {
+        uid: userDoc.id,
+        username: data.username || "User",
+        displayName: data.displayName || displayName,
+        bio: data.bio || "한줄 소개를 입력해주세요"
       }
     }
+  })
 
-    fetchUser()
+  const { data: links = [], isLoading: isLinksLoading } = useQuery({
+    queryKey: ["visitorLinks", profile?.uid],
+    queryFn: async () => {
+      if (!profile?.uid) return []
+      const linksQ = query(collection(db, `users/${profile.uid}/links`), orderBy("createdAt", "desc"))
+      const snapshot = await getDocs(linksQ)
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Link[]
+    },
+    enabled: !!profile?.uid
+  })
 
-    return () => {
-      if (unsubscribeLinks) {
-        unsubscribeLinks()
-      }
-    }
-  }, [displayName])
-
-  if (loading) {
+  if (isProfileLoading) {
     return <div className="flex min-h-svh items-center justify-center font-bold text-xl uppercase">Loading...</div>
   }
 
@@ -135,7 +118,9 @@ export default function VisitorPage({ params }: PageProps) {
 
         {/* 링크 목록 */}
         <div className="flex w-full flex-col gap-6">
-          {links.length === 0 ? (
+          {isLinksLoading ? (
+            <div className="text-center font-bold text-muted-foreground">링크 로딩 중...</div>
+          ) : links.length === 0 ? (
             <div className="border-4 border-dashed border-foreground p-8 text-center font-bold text-muted-foreground">
               아직 등록된 링크가 없습니다.
             </div>
