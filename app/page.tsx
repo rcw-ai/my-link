@@ -7,7 +7,7 @@ import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { LinkItem } from "@/components/LinkItem"
 import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
-import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth"
+import { signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User } from "firebase/auth"
 import { Button } from "@/components/ui/button"
 import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine, RiBarChartBoxLine } from "@remixicon/react"
 import Link from "next/link"
@@ -59,6 +59,11 @@ export default function Page() {
   }
 
   useEffect(() => {
+    // 리다이렉트 로그인 후 복귀 시 발생한 에러 핸들링
+    getRedirectResult(auth).catch((error) => {
+      console.error("Redirect login error:", error)
+    })
+
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser)
       setAuthInitialized(true)
@@ -225,7 +230,8 @@ export default function Page() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider)
+      // 모바일 인앱 브라우저나 팝업 차단 환경을 위해 팝업 대신 리다이렉트 방식 사용
+      await signInWithRedirect(auth, googleProvider)
     } catch (error) {
       console.error("Login failed:", error)
     }
