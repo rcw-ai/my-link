@@ -3,9 +3,10 @@
 import * as React from "react"
 import { db } from "@/lib/firebase"
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore"
-import { type Link } from "@/data/links"
+import { type Link as LinkType } from "@/data/links"
 import { LinkItem } from "@/components/LinkItem"
 import { useQuery } from "@tanstack/react-query"
+import Link from "next/link"
 
 interface PageProps {
   params: Promise<{
@@ -48,7 +49,7 @@ export default function VisitorPage({ params }: PageProps) {
       return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
-      })) as Link[]
+      })) as LinkType[]
     },
     enabled: !!profile?.uid
   })
@@ -63,17 +64,18 @@ export default function VisitorPage({ params }: PageProps) {
         <div className="flex w-full max-w-md flex-col items-center justify-center p-12 border-4 border-foreground bg-background shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,0.3)] text-center gap-8">
           <div className="text-6xl animate-bounce">🕵️‍♂️</div>
           <div className="space-y-4">
-            <h2 className="text-3xl font-black uppercase text-foreground break-keep">페이지를 찾을 수 없습니다</h2>
+            <h2 className="text-3xl font-black uppercase text-foreground break-keep">404 Not Found</h2>
             <p className="font-bold text-muted-foreground break-keep text-lg">
+              페이지를 찾을 수 없습니다.<br/>
               존재하지 않거나 삭제된 마이링크 페이지입니다.
             </p>
           </div>
-          <a
+          <Link
             href="/"
             className="w-full text-center py-4 border-4 border-foreground bg-primary text-foreground hover:bg-primary/90 font-black uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all"
           >
             내 마이링크 만들기
-          </a>
+          </Link>
         </div>
       </div>
     )
@@ -83,9 +85,9 @@ export default function VisitorPage({ params }: PageProps) {
     <div className="flex min-h-svh flex-col items-center px-6 py-16 selection:bg-primary selection:text-primary-foreground">
       {/* 헤더 */}
       <header className="w-full max-w-md flex justify-center mb-12">
-        <div className="text-2xl font-black uppercase tracking-tighter text-foreground bg-primary px-3 py-1 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]">
+        <Link href="/" className="text-2xl font-black uppercase tracking-tighter text-foreground bg-primary px-3 py-1 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] dark:hover:shadow-none">
           MyLink
-        </div>
+        </Link>
       </header>
 
       {/* 프로필 섹션 */}
@@ -134,12 +136,12 @@ export default function VisitorPage({ params }: PageProps) {
 
       {/* 푸터 */}
       <footer className="mt-20 flex flex-col items-center gap-4">
-        <a 
+        <Link 
           href="/"
           className="bg-foreground text-background px-4 py-1 font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform"
         >
           Create your own MyLink
-        </a>
+        </Link>
       </footer>
     </div>
   )

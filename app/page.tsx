@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { type Link } from "@/data/links"
+import { type Link as LinkType } from "@/data/links"
 import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { LinkItem } from "@/components/LinkItem"
 import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth"
 import { Button } from "@/components/ui/button"
-import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine } from "@remixicon/react"
+import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine } from "@remixicon/react"
+import Link from "next/link"
 
 export default function Page() {
   const queryClient = useQueryClient()
@@ -114,7 +115,7 @@ export default function Page() {
       return snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
-      })) as Link[]
+      })) as LinkType[]
     },
     enabled: !!user,
   })
@@ -153,7 +154,7 @@ export default function Page() {
 
   // Add Link Mutation
   const addLinkMutation = useMutation({
-    mutationFn: async (newLink: Link) => {
+    mutationFn: async (newLink: LinkType) => {
       if (!user) throw new Error("No user")
       await addDoc(collection(db, `users/${user.uid}/links`), {
         title: newLink.title,
@@ -295,6 +296,13 @@ export default function Page() {
             </div>
             
             <div className="absolute right-0 mt-2 w-48 border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 origin-top-right">
+              <Link 
+                href={`/${displayName}`}
+                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
+              >
+                <RiExternalLinkLine size={18} />
+                내 페이지 보기
+              </Link>
               <button 
                 onClick={handleCopyLink}
                 className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
