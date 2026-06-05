@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { type Link as LinkType } from "@/data/links"
 import { AddLinkDialog } from "@/components/AddLinkDialog"
 import { LinkItem } from "@/components/LinkItem"
+import { LandingView } from "@/components/LandingView"
 import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User } from "firebase/auth"
@@ -282,6 +283,10 @@ export default function Page() {
     return <div className="flex min-h-svh items-center justify-center font-bold text-xl uppercase">Loading...</div>
   }
 
+  if (!user) {
+    return <LandingView onLogin={handleLogin} />
+  }
+
   const username = profile?.username || "User"
   const displayName = profile?.displayName || "user"
   const bio = profile?.bio || "한줄 소개를 입력해주세요"
@@ -293,184 +298,160 @@ export default function Page() {
         <Link href="/" className="text-2xl font-black uppercase tracking-tighter text-foreground bg-primary px-3 py-1 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] dark:hover:shadow-none">
           MyLink
         </Link>
-        {user ? (
-          <div className="relative group">
-            <div className="h-10 w-10 border-2 border-foreground bg-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all flex items-center justify-center">
-              <span className="font-black text-sm text-foreground">
-                {username.substring(0, 2).toUpperCase() || "ML"}
-              </span>
-            </div>
-            
-            <div className="absolute right-0 mt-2 w-48 border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 origin-top-right">
-              <Link 
-                href={`/${displayName}`}
-                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
-              >
-                <RiExternalLinkLine size={18} />
-                내 페이지 보기
-              </Link>
-              <Link
-                href="/stats"
-                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
-              >
-                <RiBarChartBoxLine size={18} />
-                링크 통계
-              </Link>
-              <button 
-                onClick={handleCopyLink}
-                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
-              >
-                {copied ? <RiCheckLine size={18} /> : <RiFileCopyLine size={18} />}
-                {copied ? "복사완료!" : "링크 복사"}
-              </button>
-              <button 
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase hover:bg-destructive text-foreground hover:text-destructive-foreground transition-colors"
-              >
-                <RiLogoutBoxLine size={18} />
-                로그아웃
-              </button>
-            </div>
+        <div className="relative group">
+          <div className="h-10 w-10 border-2 border-foreground bg-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all flex items-center justify-center">
+            <span className="font-black text-sm text-foreground">
+              {username.substring(0, 2).toUpperCase() || "ML"}
+            </span>
           </div>
-        ) : (
-          <Button onClick={handleLogin} className="border-4 border-foreground bg-primary text-foreground hover:bg-primary/90 font-bold uppercase shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all rounded-none">
-            Login
-          </Button>
-        )}
+          
+          <div className="absolute right-0 mt-2 w-48 border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] flex flex-col opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 origin-top-right">
+            <Link 
+              href={`/${displayName}`}
+              className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
+            >
+              <RiExternalLinkLine size={18} />
+              내 페이지 보기
+            </Link>
+            <Link
+              href="/stats"
+              className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
+            >
+              <RiBarChartBoxLine size={18} />
+              링크 통계
+            </Link>
+            <button 
+              onClick={handleCopyLink}
+              className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
+            >
+              {copied ? <RiCheckLine size={18} /> : <RiFileCopyLine size={18} />}
+              {copied ? "복사완료!" : "링크 복사"}
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase hover:bg-destructive text-foreground hover:text-destructive-foreground transition-colors"
+            >
+              <RiLogoutBoxLine size={18} />
+              로그아웃
+            </button>
+          </div>
+        </div>
       </header>
 
       {/* 메인 콘텐츠 */}
-      {user ? (
-        <div className="flex w-full max-w-md flex-col items-center">
-          {/* 프로필 섹션 */}
-          <div className="mb-12 flex flex-col items-center text-center w-full">
-            <div className="relative mb-6">
-              <div className="absolute inset-0 translate-x-1.5 translate-y-1.5 bg-foreground" />
-              <div className="relative border-4 border-foreground bg-primary p-1">
-                <div className="h-24 w-24 bg-background flex items-center justify-center border-2 border-foreground overflow-hidden">
-                  <span className="text-4xl font-black text-foreground">{username.substring(0, 2).toUpperCase() || "ML"}</span>
-                </div>
+      <div className="flex w-full max-w-md flex-col items-center">
+        {/* 프로필 섹션 */}
+        <div className="mb-12 flex flex-col items-center text-center w-full">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 translate-x-1.5 translate-y-1.5 bg-foreground" />
+            <div className="relative border-4 border-foreground bg-primary p-1">
+              <div className="h-24 w-24 bg-background flex items-center justify-center border-2 border-foreground overflow-hidden">
+                <span className="text-4xl font-black text-foreground">{username.substring(0, 2).toUpperCase() || "ML"}</span>
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-col items-center gap-3 w-full">
-              {isEditingUsername ? (
-                <div className="flex flex-col items-center w-full max-w-xs">
+          <div className="flex flex-col items-center gap-3 w-full">
+            {isEditingUsername ? (
+              <div className="flex flex-col items-center w-full max-w-xs">
+                <input
+                  type="text"
+                  value={tempUsername}
+                  onChange={(e) => setTempUsername(e.target.value)}
+                  onBlur={handleUsernameSave}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleUsernameSave() }}
+                  className="text-2xl font-black text-center border-4 border-foreground bg-background px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none w-full"
+                  autoFocus
+                />
+                <span className="text-[10px] text-muted-foreground mt-1 font-bold">실명을 입력하고 Enter를 누르세요.</span>
+              </div>
+            ) : (
+              <h1 
+                onClick={() => {
+                  setTempUsername(username)
+                  setIsEditingUsername(true)
+                }}
+                className="text-3xl font-black uppercase tracking-tighter text-foreground bg-accent px-4 py-2 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all"
+                title="클릭하여 수정"
+              >
+                {username}
+              </h1>
+            )}
+
+            {isEditingDisplayName ? (
+              <div className="flex flex-col items-center w-full max-w-xs">
+                <div className="relative w-full flex items-center">
+                  <span className="absolute left-3 text-lg font-black text-foreground">@</span>
                   <input
                     type="text"
-                    value={tempUsername}
-                    onChange={(e) => setTempUsername(e.target.value)}
-                    onBlur={handleUsernameSave}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleUsernameSave() }}
-                    className="text-2xl font-black text-center border-4 border-foreground bg-background px-4 py-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none w-full"
+                    value={tempDisplayName}
+                    onChange={(e) => setTempDisplayName(e.target.value)}
+                    onBlur={handleDisplayNameSave}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleDisplayNameSave() }}
+                    className="pl-8 pr-4 py-2 w-full font-bold text-lg text-center border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none"
                     autoFocus
                   />
-                  <span className="text-[10px] text-muted-foreground mt-1 font-bold">실명을 입력하고 Enter를 누르세요.</span>
                 </div>
-              ) : (
-                <h1 
-                  onClick={() => {
-                    setTempUsername(username)
-                    setIsEditingUsername(true)
-                  }}
-                  className="text-3xl font-black uppercase tracking-tighter text-foreground bg-accent px-4 py-2 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all"
-                  title="클릭하여 수정"
-                >
-                  {username}
-                </h1>
-              )}
-
-              {isEditingDisplayName ? (
-                <div className="flex flex-col items-center w-full max-w-xs">
-                  <div className="relative w-full flex items-center">
-                    <span className="absolute left-3 text-lg font-black text-foreground">@</span>
-                    <input
-                      type="text"
-                      value={tempDisplayName}
-                      onChange={(e) => setTempDisplayName(e.target.value)}
-                      onBlur={handleDisplayNameSave}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleDisplayNameSave() }}
-                      className="pl-8 pr-4 py-2 w-full font-bold text-lg text-center border-4 border-foreground bg-background shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] focus:outline-none"
-                      autoFocus
-                    />
-                  </div>
-                  
-                  {isCheckingDuplicate && (
-                    <span className="text-xs text-blue-500 font-bold mt-2">중복 확인 중...</span>
-                  )}
-                  {!isCheckingDuplicate && displayNameError && (
-                    <span className="text-xs text-destructive font-bold mt-2">{displayNameError}</span>
-                  )}
-                  {!isCheckingDuplicate && !displayNameError && tempDisplayName && tempDisplayName !== displayName && (
-                    <span className="text-xs text-emerald-500 font-bold mt-2">사용 가능한 닉네임입니다.</span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground mt-1">닉네임은 고유한 공유 URL로 사용됩니다.</span>
-                </div>
-              ) : (
-                <p 
-                  onClick={() => {
-                    setTempDisplayName(displayName)
-                    setIsEditingDisplayName(true)
-                  }}
-                  className="font-bold text-lg text-foreground px-2 cursor-pointer hover:text-primary transition-colors"
-                  title="클릭하여 수정"
-                >
-                  @{displayName}
-                </p>
-              )}
-            </div>
-
-            {isEditingBio ? (
-              <input
-                type="text"
-                value={tempBio}
-                onChange={(e) => setTempBio(e.target.value)}
-                onBlur={handleBioSave}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleBioSave() }}
-                className="mt-6 max-w-xs w-full font-medium leading-relaxed text-center border-b-2 border-foreground bg-transparent focus:outline-none"
-                autoFocus
-              />
+                
+                {isCheckingDuplicate && (
+                  <span className="text-xs text-blue-500 font-bold mt-2">중복 확인 중...</span>
+                )}
+                {!isCheckingDuplicate && displayNameError && (
+                  <span className="text-xs text-destructive font-bold mt-2">{displayNameError}</span>
+                )}
+                {!isCheckingDuplicate && !displayNameError && tempDisplayName && tempDisplayName !== displayName && (
+                  <span className="text-xs text-emerald-500 font-bold mt-2">사용 가능한 닉네임입니다.</span>
+                )}
+                <span className="text-[10px] text-muted-foreground mt-1">닉네임은 고유한 공유 URL로 사용됩니다.</span>
+              </div>
             ) : (
               <p 
                 onClick={() => {
-                  setTempBio(bio)
-                  setIsEditingBio(true)
+                  setTempDisplayName(displayName)
+                  setIsEditingDisplayName(true)
                 }}
-                className="mt-6 max-w-xs font-medium leading-relaxed text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
+                className="font-bold text-lg text-foreground px-2 cursor-pointer hover:text-primary transition-colors"
                 title="클릭하여 수정"
               >
-                &quot;{bio}&quot;
+                @{displayName}
               </p>
             )}
           </div>
 
-          {/* 링크 목록 */}
-          <div className="flex w-full flex-col gap-6">
-            <AddLinkDialog onAdd={(link) => addLinkMutation.mutate(link)} />
-            {isLinksLoading ? (
-              <div className="text-center font-bold text-muted-foreground">링크 로딩 중...</div>
-            ) : linkList.map((link) => (
-              <LinkItem key={link.id} link={link} userId={user.uid} />
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="flex w-full max-w-md flex-col items-center justify-center p-12 border-4 border-foreground bg-background shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] dark:shadow-[8px_8px_0px_0px_rgba(255,255,255,0.3)] text-center gap-8 mt-4">
-          <div className="text-6xl animate-bounce">👋</div>
-          <div className="space-y-4">
-            <h2 className="text-3xl font-black uppercase text-foreground break-keep">로그인이 필요합니다</h2>
-            <p className="font-bold text-muted-foreground break-keep text-lg">
-              마이링크를 사용하여 나만의 멀티 링크 페이지를 만들어보세요.
+          {isEditingBio ? (
+            <input
+              type="text"
+              value={tempBio}
+              onChange={(e) => setTempBio(e.target.value)}
+              onBlur={handleBioSave}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleBioSave() }}
+              className="mt-6 max-w-xs w-full font-medium leading-relaxed text-center border-b-2 border-foreground bg-transparent focus:outline-none"
+              autoFocus
+            />
+          ) : (
+            <p 
+              onClick={() => {
+                setTempBio(bio)
+                setIsEditingBio(true)
+              }}
+              className="mt-6 max-w-xs font-medium leading-relaxed text-muted-foreground italic cursor-pointer hover:text-foreground transition-colors"
+              title="클릭하여 수정"
+            >
+              &quot;{bio}&quot;
             </p>
-          </div>
-          <Button
-            onClick={handleLogin}
-            className="w-full py-8 text-xl border-4 border-foreground bg-primary text-foreground hover:bg-primary/90 font-black uppercase shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all rounded-none"
-          >
-            구글 계정으로 시작하기
-          </Button>
+          )}
         </div>
-      )}
+
+        {/* 링크 목록 */}
+        <div className="flex w-full flex-col gap-6">
+          <AddLinkDialog onAdd={(link) => addLinkMutation.mutate(link)} />
+          {isLinksLoading ? (
+            <div className="text-center font-bold text-muted-foreground">링크 로딩 중...</div>
+          ) : linkList.map((link) => (
+            <LinkItem key={link.id} link={link} userId={user.uid} />
+          ))}
+        </div>
+      </div>
 
       {/* 푸터 */}
       <footer className="mt-20 flex flex-col items-center gap-4">
