@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- 공통 유틸리티 함수 ---
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 기본적으로 명시되지 않은 경로는 모두 접근 차단
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- 1. Users 컬렉션 (사용자 기본 정보) ---
+    match /users/{userId} {
+      // 사용자 기본 정보 읽기는 누구나 가능
+      allow read: if true;
+      // 사용자 문서 수정/생성은 본인만 가능
+      allow write: if isOwner(userId);
+
+      // --- 2. Links 하위 컬렉션 ---
+      // 경로: users/(userId)/links/{linkId}
+      match /links/{linkId} {
+        // 랜딩 페이지를 위해 링크 목록은 누구나 조회 가능
+        allow read: if true;
+        // 링크 추가/삭제는 본인만 가능
+        allow create, delete: if isOwner(userId);
+        // 링크 수정: 본인은 모든 필드 수정 가능,
+        // 비인증 사용자는 clickCount 필드 하나만 증가 허용 (클릭 추적)
+        allow update: if isOwner(userId) ||
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clickCount']) &&
+            request.resource.data.clickCount == resource.data.get('clickCount', 0) + 1
+          );
+      }
+
+      // --- 3. Profile 하위 컬렉션 ---
+      // 경로: users/(userId)/profile/{profileId}
+      match /profile/{profileId} {
+        // 랜딩 페이지에 표시되는 프로필 정보이므로 누구나 조회 가능
+        allow read: if true;
+        // 프로필 편집은 본인만 가능
+        allow write: if isOwner(userId);
+      }
+      
+      // ==========================================
+      // 여기서부터는 고려해볼 만한 추가(제안) 규칙들입니다.
+      // ==========================================
+
+      // --- [제안] 4. Analytics/클릭 통계 하위 컬렉션 ---
+      // 사용자가 어떤 링크를 클릭했는지 기록할 경우 (경로: users/(userId)/clicks/{clickId})
+      match /clicks/{clickId} {
+        // 통계 열람은 페이지 소유자 본인만 가능
+        allow read: if isOwner(userId); 
+        // 누구나 방문하여 링크를 클릭할 수 있으므로 생성(create)은 허용
+        allow create: if true;
+        // 한 번 기록된 클릭 데이터는 수정 및 삭제 금지
+        allow update, delete: if false;
+      }
+    }
+    
+    // --- [제안] 5. Usernames 컬렉션 (고유 URL, 닉네임 중복 체크용) ---
+    // /[displayName] 동적 라우팅을 구현하려면 닉네임 선점/중복 확인용 최상위 컬렉션이 필요합니다.
+    match /usernames/{username} {
+      // 누구나 특정 닉네임의 사용 여부를 조회할 수 있음
+      allow read: if true;
+      // 닉네임 생성 시, 문서 내에 저장하는 userId가 로그인한 사용자의 UID와 일치해야 함
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      // 닉네임 삭제(변경) 시, 기존에 저장된 데이터의 소유자만 삭제 가능
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update: if false; // 닉네임은 수정하기보다 삭제 후 재생성 방식을 권장
+    }
+  }
+}

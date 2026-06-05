@@ -9,7 +9,7 @@ import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth"
 import { Button } from "@/components/ui/button"
-import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine } from "@remixicon/react"
+import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine, RiBarChartBoxLine } from "@remixicon/react"
 import Link from "next/link"
 
 export default function Page() {
@@ -284,9 +284,9 @@ export default function Page() {
     <div className="flex min-h-svh flex-col items-center px-6 py-16 selection:bg-primary selection:text-primary-foreground">
       {/* 헤더 */}
       <header className="w-full max-w-md flex justify-between items-center mb-12">
-        <div className="text-2xl font-black uppercase tracking-tighter text-foreground bg-primary px-3 py-1 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)]">
+        <Link href="/" className="text-2xl font-black uppercase tracking-tighter text-foreground bg-primary px-3 py-1 border-4 border-foreground shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-1 hover:translate-x-1 hover:shadow-none transition-all dark:shadow-[4px_4px_0px_0px_rgba(255,255,255,0.3)] dark:hover:shadow-none">
           MyLink
-        </div>
+        </Link>
         {user ? (
           <div className="relative group">
             <div className="h-10 w-10 border-2 border-foreground bg-background overflow-hidden shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] cursor-pointer hover:translate-y-0.5 hover:translate-x-0.5 hover:shadow-none transition-all flex items-center justify-center">
@@ -302,6 +302,13 @@ export default function Page() {
               >
                 <RiExternalLinkLine size={18} />
                 내 페이지 보기
+              </Link>
+              <Link
+                href="/stats"
+                className="flex items-center gap-2 px-4 py-3 text-left font-bold uppercase border-b-2 border-foreground hover:bg-secondary text-foreground transition-colors"
+              >
+                <RiBarChartBoxLine size={18} />
+                링크 통계
               </Link>
               <button 
                 onClick={handleCopyLink}

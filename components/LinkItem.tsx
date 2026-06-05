@@ -4,7 +4,7 @@ import { useState, ElementType } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { type Link } from "@/data/links"
 import { db } from "@/lib/firebase"
-import { doc, updateDoc, deleteDoc } from "firebase/firestore"
+import { doc, updateDoc, deleteDoc, increment } from "firebase/firestore"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -23,7 +23,8 @@ import {
   RiPencilLine,
   RiDeleteBinLine,
   RiCheckLine,
-  RiCloseLine
+  RiCloseLine,
+  RiCursorLine
 } from "@remixicon/react"
 
 const iconMap: Record<string, ElementType> = {
@@ -101,6 +102,20 @@ export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
     deleteLinkMutation.mutate()
   }
 
+  const handleLinkClick = async () => {
+    // 편집 모드(본인 페이지)에서는 카운트 증가 안 함 — 방문자 클릭만 집계
+    if (!readOnly) return
+    try {
+      const docRef = doc(db, `users/${userId}/links`, link.id)
+      await updateDoc(docRef, {
+        clickCount: increment(1)
+      })
+    } catch (error) {
+      // 클릭 카운트 실패는 사용자 경험에 영향 없이 무시
+      console.error("Click count update failed:", error)
+    }
+  }
+
   const handleCancelEdit = () => {
     form.reset({ title: link.title, url: link.url })
     setIsEditing(false)
@@ -176,6 +191,7 @@ export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="relative flex-1"
+          onClick={handleLinkClick}
         >
           <div className="absolute inset-0 translate-x-1.5 translate-y-1.5 bg-foreground transition-transform group-hover:translate-x-1 group-hover:translate-y-1 group-active:translate-x-0 group-active:translate-y-0" />
           
@@ -187,7 +203,15 @@ export function LinkItem({ link, userId, readOnly = false }: LinkItemProps) {
                 </div>
                 <span className="text-lg font-black uppercase tracking-tight break-all line-clamp-2">{link.title}</span>
               </div>
-              <RiExternalLinkLine size={20} className="text-foreground shrink-0 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ml-2" />
+              <div className="flex items-center gap-2 ml-2 shrink-0">
+                {!readOnly && (
+                  <div className="flex items-center gap-1 border-2 border-foreground bg-accent px-2 py-0.5 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] dark:shadow-[2px_2px_0px_0px_rgba(255,255,255,0.2)]">
+                    <RiCursorLine size={12} className="text-foreground" />
+                    <span className="text-xs font-black tabular-nums">{link.clickCount ?? 0}</span>
+                  </div>
+                )}
+                <RiExternalLinkLine size={20} className="text-foreground transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
             </CardContent>
           </Card>
         </a>
