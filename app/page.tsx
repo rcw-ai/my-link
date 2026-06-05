@@ -9,7 +9,6 @@ import { LandingView } from "@/components/LandingView"
 import { auth, db, googleProvider } from "@/lib/firebase"
 import { collection, addDoc, query, orderBy, serverTimestamp, doc, getDoc, setDoc, where, getDocs } from "firebase/firestore"
 import { signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, signInWithPopup } from "firebase/auth"
-import { Button } from "@/components/ui/button"
 import { RiFileCopyLine, RiCheckLine, RiLogoutBoxLine, RiExternalLinkLine, RiBarChartBoxLine } from "@remixicon/react"
 import Link from "next/link"
 
@@ -140,7 +139,7 @@ export default function Page() {
       // 캐시를 새로운 값으로 즉시 업데이트
       if (previousProfile) {
         queryClient.setQueryData(["profile", user?.uid], {
-          ...(previousProfile as any),
+          ...(previousProfile as Record<string, unknown>),
           ...newData
         })
       }
