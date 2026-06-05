@@ -245,12 +245,10 @@ export default function Page() {
         return
       }
 
-      // 모바일 기기에서는 팝업 차단을 피하기 위해 리다이렉트 사용, PC/개발환경에서는 팝업 사용
-      if (isMobile) {
-        await signInWithRedirect(auth, googleProvider)
-      } else {
-        await signInWithPopup(auth, googleProvider)
-      }
+      // 인앱 브라우저가 아닌 일반 브라우저(Safari, Chrome 등)에서는 
+      // 모바일/PC 상관없이 가장 안정적인 팝업 방식을 사용합니다.
+      // (리다이렉트 방식은 iOS ITP 등 서드파티 쿠키 차단 환경에서 세션 유실 문제가 잦음)
+      await signInWithPopup(auth, googleProvider)
     } catch (error) {
       console.error("Login failed:", error)
     }
